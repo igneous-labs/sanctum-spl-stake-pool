@@ -1,9 +1,0 @@
-[package]
-name = "cgen"
-version = "0.1.0"
-authors = ["Solana Labs Maintainers <maintainers@solanalabs.com>"]
-publish = false
-edition = "2021"
-
-[dependencies]
-cbindgen = "=0.16.0"
