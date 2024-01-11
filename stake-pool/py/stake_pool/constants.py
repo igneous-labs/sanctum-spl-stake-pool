@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 from solana.publickey import PublicKey
 from stake.constants import MINIMUM_DELEGATION
 
-STAKE_POOL_PROGRAM_ID: PublicKey = PublicKey("SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy")
+STAKE_POOL_PROGRAM_ID: PublicKey = PublicKey("SP12tWFxD9oJsVWNavTTBZvMbA6gkAmxtVgxdqvyvhY")
 """Public key that identifies the SPL Stake Pool program."""
 
 MAX_VALIDATORS_TO_UPDATE: int = 5

@@ -31,7 +31,7 @@ def solana_test_validator():
     validator = Popen([
         "solana-test-validator",
         "--reset", "--quiet",
-        "--bpf-program", "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+        "--bpf-program", "SP12tWFxD9oJsVWNavTTBZvMbA6gkAmxtVgxdqvyvhY",
         f"{old_cwd}/../../target/deploy/spl_stake_pool.so",
         "--bpf-program", "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
         f"{old_cwd}/../program/tests/fixtures/mpl_token_metadata.so",
