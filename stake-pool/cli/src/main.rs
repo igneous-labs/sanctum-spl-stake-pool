@@ -52,6 +52,8 @@ use {
         state::{Fee, FeeType, StakePool, ValidatorList, ValidatorStakeInfo},
         MINIMUM_RESERVE_LAMPORTS,
     },
+    spl_token::instruction::AuthorityType,
+    spl_token_2022::extension::StateWithExtensions,
     std::{cmp::Ordering, num::NonZeroU32, process::exit, rc::Rc},
 };
 
@@ -231,7 +233,7 @@ fn command_create_pool(
     max_validators: u32,
     stake_pool_keypair: Option<Keypair>,
     validator_list_keypair: Option<Keypair>,
-    mint_keypair: Option<Keypair>,
+    mint_pubkey: Pubkey,
     reserve_keypair: Option<Keypair>,
     unsafe_fees: bool,
 ) -> CommandResult {
@@ -240,9 +242,6 @@ fn command_create_pool(
     }
     let reserve_keypair = reserve_keypair.unwrap_or_else(Keypair::new);
     println!("Creating reserve stake {}", reserve_keypair.pubkey());
-
-    let mint_keypair = mint_keypair.unwrap_or_else(Keypair::new);
-    println!("Creating mint {}", mint_keypair.pubkey());
 
     let stake_pool_keypair = stake_pool_keypair.unwrap_or_else(Keypair::new);
 
@@ -272,8 +271,6 @@ fn command_create_pool(
         + stake_pool_account_lamports
         + validator_list_balance;
 
-    let default_decimals = spl_token::native_mint::DECIMALS;
-
     // Calculate withdraw authority used for minting pool tokens
     let (withdraw_authority, _) = find_withdraw_authority_program_address(
         &spl_stake_pool::id(),
@@ -301,27 +298,29 @@ fn command_create_pool(
             },
             &stake::state::Lockup::default(),
         ),
-        // Account for the stake pool mint
-        system_instruction::create_account(
-            &config.fee_payer.pubkey(),
-            &mint_keypair.pubkey(),
-            mint_account_balance,
-            spl_token::state::Mint::LEN as u64,
-            &spl_token::id(),
-        ),
-        // Initialize pool token mint account
-        spl_token::instruction::initialize_mint(
-            &spl_token::id(),
-            &mint_keypair.pubkey(),
-            &withdraw_authority,
-            None,
-            default_decimals,
-        )?,
     ];
+
+    // Transfer mint authority to stake pool withdraw authority if not already set
+    let mint_account = config.rpc_client.get_account(&mint_pubkey)?;
+    let StateWithExtensions { base: mint, .. } =
+        StateWithExtensions::<spl_token_2022::state::Mint>::unpack(&mint_account.data)?;
+    let mint_auth = mint
+        .mint_authority
+        .ok_or("mint has not mint authority".to_owned())?;
+    if mint_auth != withdraw_authority {
+        instructions.push(spl_token::instruction::set_authority(
+            &mint_account.owner,
+            &mint_pubkey,
+            Some(&withdraw_authority),
+            AuthorityType::MintTokens,
+            &mint_auth,
+            &[],
+        )?)
+    }
 
     let pool_fee_account = add_associated_token_account(
         config,
-        &mint_keypair.pubkey(),
+        &mint_pubkey,
         &config.manager.pubkey(),
         &mut instructions,
         &mut total_rent_free_balances,
@@ -361,7 +360,7 @@ fn command_create_pool(
                 &withdraw_authority,
                 &validator_list_keypair.pubkey(),
                 &reserve_keypair.pubkey(),
-                &mint_keypair.pubkey(),
+                &mint_pubkey,
                 &pool_fee_account,
                 &spl_token::id(),
                 deposit_authority.as_ref().map(|x| x.pubkey()),
@@ -381,7 +380,7 @@ fn command_create_pool(
             + config.rpc_client.get_fee_for_message(&setup_message)?
             + config.rpc_client.get_fee_for_message(&initialize_message)?,
     )?;
-    let mut setup_signers = vec![config.fee_payer.as_ref(), &mint_keypair, &reserve_keypair];
+    let mut setup_signers = vec![config.fee_payer.as_ref(), &reserve_keypair];
     unique_signers!(setup_signers);
     let setup_transaction = Transaction::new(&setup_signers, setup_message, recent_blockhash);
     let mut initialize_signers = vec![
@@ -2089,12 +2088,17 @@ fn main() {
                     .help("Validator list keypair [default: new keypair]"),
             )
             .arg(
-                Arg::with_name("mint_keypair")
-                    .long("mint-keypair")
-                    .validator(is_keypair_or_ask_keyword)
+                Arg::with_name("mint_pubkey")
+                    .long("mint-pubkey")
+                    .validator(is_valid_pubkey)
                     .value_name("PATH")
                     .takes_value(true)
-                    .help("Stake pool mint keypair [default: new keypair]"),
+                    .required(true)
+                    .help(
+                        "Stake pool mint pubkey. \
+                        Must be an initialized mint with 0 supply, 9 decimals, and no freeze authority. \
+                        The mint authority will be transferred to the stake pool's withdraw authority if not already set to it."
+                    ),
             )
             .arg(
                 Arg::with_name("reserve_keypair")
@@ -2790,7 +2794,7 @@ fn main() {
             let max_validators = value_t_or_exit!(arg_matches, "max_validators", u32);
             let pool_keypair = keypair_of(arg_matches, "pool_keypair");
             let validator_list_keypair = keypair_of(arg_matches, "validator_list_keypair");
-            let mint_keypair = keypair_of(arg_matches, "mint_keypair");
+            let mint_pubkey = pubkey_of(arg_matches, "mint_pubkey").unwrap();
             let reserve_keypair = keypair_of(arg_matches, "reserve_keypair");
             let unsafe_fees = arg_matches.is_present("unsafe_fees");
             command_create_pool(
@@ -2812,7 +2816,7 @@ fn main() {
                 max_validators,
                 pool_keypair,
                 validator_list_keypair,
-                mint_keypair,
+                mint_pubkey,
                 reserve_keypair,
                 unsafe_fees,
             )

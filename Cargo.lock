@@ -5025,6 +5025,7 @@ dependencies = [
  "spl-associated-token-account 2.2.0",
  "spl-stake-pool",
  "spl-token 4.0.0",
+ "spl-token-2022 0.9.0",
 ]
 
 [[package]]
