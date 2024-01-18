@@ -325,66 +325,57 @@ fn command_create_pool(
         &mut instructions,
         &mut total_rent_free_balances,
     );
-    println!("Creating pool fee collection account {}", pool_fee_account);
+    instructions.extend([
+        // Validator stake account list storage
+        system_instruction::create_account(
+            &config.fee_payer.pubkey(),
+            &validator_list_keypair.pubkey(),
+            validator_list_balance,
+            validator_list_size as u64,
+            &spl_stake_pool::id(),
+        ),
+        // Account for the stake pool
+        system_instruction::create_account(
+            &config.fee_payer.pubkey(),
+            &stake_pool_keypair.pubkey(),
+            stake_pool_account_lamports,
+            get_packed_len::<StakePool>() as u64,
+            &spl_stake_pool::id(),
+        ),
+        // Initialize stake pool
+        spl_stake_pool::instruction::initialize(
+            &spl_stake_pool::id(),
+            &stake_pool_keypair.pubkey(),
+            &config.manager.pubkey(),
+            &config.staker.pubkey(),
+            &withdraw_authority,
+            &validator_list_keypair.pubkey(),
+            &reserve_keypair.pubkey(),
+            &mint_pubkey,
+            &pool_fee_account,
+            &spl_token::id(),
+            deposit_authority.as_ref().map(|x| x.pubkey()),
+            epoch_fee,
+            withdrawal_fee,
+            deposit_fee,
+            referral_fee,
+            max_validators,
+        ),
+    ]);
 
     let recent_blockhash = get_latest_blockhash(&config.rpc_client)?;
-    let setup_message = Message::new_with_blockhash(
-        &instructions,
-        Some(&config.fee_payer.pubkey()),
-        &recent_blockhash,
-    );
     let initialize_message = Message::new_with_blockhash(
-        &[
-            // Validator stake account list storage
-            system_instruction::create_account(
-                &config.fee_payer.pubkey(),
-                &validator_list_keypair.pubkey(),
-                validator_list_balance,
-                validator_list_size as u64,
-                &spl_stake_pool::id(),
-            ),
-            // Account for the stake pool
-            system_instruction::create_account(
-                &config.fee_payer.pubkey(),
-                &stake_pool_keypair.pubkey(),
-                stake_pool_account_lamports,
-                get_packed_len::<StakePool>() as u64,
-                &spl_stake_pool::id(),
-            ),
-            // Initialize stake pool
-            spl_stake_pool::instruction::initialize(
-                &spl_stake_pool::id(),
-                &stake_pool_keypair.pubkey(),
-                &config.manager.pubkey(),
-                &config.staker.pubkey(),
-                &withdraw_authority,
-                &validator_list_keypair.pubkey(),
-                &reserve_keypair.pubkey(),
-                &mint_pubkey,
-                &pool_fee_account,
-                &spl_token::id(),
-                deposit_authority.as_ref().map(|x| x.pubkey()),
-                epoch_fee,
-                withdrawal_fee,
-                deposit_fee,
-                referral_fee,
-                max_validators,
-            ),
-        ],
+        &instructions,
         Some(&config.fee_payer.pubkey()),
         &recent_blockhash,
     );
     check_fee_payer_balance(
         config,
-        total_rent_free_balances
-            + config.rpc_client.get_fee_for_message(&setup_message)?
-            + config.rpc_client.get_fee_for_message(&initialize_message)?,
+        total_rent_free_balances + config.rpc_client.get_fee_for_message(&initialize_message)?,
     )?;
-    let mut setup_signers = vec![config.fee_payer.as_ref(), &reserve_keypair];
-    unique_signers!(setup_signers);
-    let setup_transaction = Transaction::new(&setup_signers, setup_message, recent_blockhash);
     let mut initialize_signers = vec![
         config.fee_payer.as_ref(),
+        &reserve_keypair,
         &stake_pool_keypair,
         &validator_list_keypair,
         config.manager.as_ref(),
@@ -402,8 +393,6 @@ fn command_create_pool(
         unique_signers!(initialize_signers);
         Transaction::new(&initialize_signers, initialize_message, recent_blockhash)
     };
-    send_transaction(config, setup_transaction)?;
-
     println!(
         "Creating stake pool {} with validator list {}",
         stake_pool_keypair.pubkey(),
