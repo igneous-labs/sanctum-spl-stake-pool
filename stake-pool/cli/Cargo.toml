@@ -1,11 +1,11 @@
 [package]
-authors = ["Solana Labs Maintainers <maintainers@solanalabs.com>"]
-description = "SPL-Stake-Pool Command-line Utility"
+authors = ["Solana Labs Maintainers <maintainers@solanalabs.com>", "Sanctum Labs Maintainers <maintainers@socean.fi>"]
+description = "Sanctum-maintained SPL-Stake-Pool Command-line Utility"
 edition = "2021"
 homepage = "https://spl.solana.com/stake-pool"
 license = "Apache-2.0"
 name = "spl-stake-pool-cli"
-repository = "https://github.com/solana-labs/solana-program-library"
+repository = "https://github.com/igneous-labs/sanctum-spl-stake-pool"
 version = "1.0.0"
 
 [dependencies]
@@ -39,5 +39,5 @@ bs58 = "0.4.0"
 bincode = "1.3.1"
 
 [[bin]]
-name = "spl-stake-pool"
+name = "stm-stake-pool"
 path = "src/main.rs"
