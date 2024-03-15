@@ -2,6 +2,7 @@
 mod client;
 mod output;
 
+use solana_client::rpc_client::SerializableTransaction;
 // use instruction::create_associated_token_account once ATA 1.0.5 is released
 #[allow(deprecated)]
 use spl_associated_token_account::create_associated_token_account;
@@ -151,11 +152,11 @@ fn get_latest_blockhash(client: &RpcClient) -> Result<Hash, Error> {
 
 fn send_transaction_no_wait(
     config: &Config,
-    transaction: Transaction,
+    transaction: impl SerializableTransaction,
 ) -> solana_client::client_error::Result<()> {
     if config.dry_run {
         let result = config.rpc_client.simulate_transaction(&transaction)?;
-        println!("Simulate result: {:?}", result);
+        println!("Simulate result: {:#?}", result);
     } else {
         let signature = config.rpc_client.send_transaction(&transaction)?;
         println!("Signature: {}", signature);
@@ -165,11 +166,11 @@ fn send_transaction_no_wait(
 
 fn send_transaction(
     config: &Config,
-    transaction: Transaction,
+    transaction: impl SerializableTransaction,
 ) -> solana_client::client_error::Result<()> {
     if config.dry_run {
         let result = config.rpc_client.simulate_transaction(&transaction)?;
-        println!("Simulate result: {:?}", result);
+        println!("Simulate result: {:#?}", result);
     } else {
         let signature = config
             .rpc_client
