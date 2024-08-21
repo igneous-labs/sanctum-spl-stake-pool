@@ -51,6 +51,7 @@ export async function prepareWithdrawAccounts(
   amount: BN,
   compareFn?: (a: ValidatorAccount, b: ValidatorAccount) => number,
   skipFee?: boolean,
+  stakePoolProgramId = STAKE_POOL_PROGRAM_ID
 ): Promise<WithdrawAccount[]> {
   const validatorListAcc = await connection.getAccountInfo(stakePool.validatorList);
   const validatorList = ValidatorListLayout.decode(validatorListAcc?.data) as ValidatorList;
@@ -78,7 +79,7 @@ export async function prepareWithdrawAccounts(
     }
 
     const stakeAccountAddress = await findStakeProgramAddress(
-      STAKE_POOL_PROGRAM_ID,
+      stakePoolProgramId,
       validator.voteAccountAddress,
       stakePoolAddress,
     );
@@ -98,7 +99,7 @@ export async function prepareWithdrawAccounts(
     const transientStakeLamports = validator.transientStakeLamports.sub(minBalance);
     if (transientStakeLamports.gt(new BN(0))) {
       const transientStakeAccountAddress = await findTransientStakeProgramAddress(
-        STAKE_POOL_PROGRAM_ID,
+        stakePoolProgramId,
         validator.voteAccountAddress,
         stakePoolAddress,
         validator.transientSeedSuffixStart,
